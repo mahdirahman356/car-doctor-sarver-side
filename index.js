@@ -26,6 +26,20 @@ const client = new MongoClient(uri, {
   }
 });
 
+const verifyToken = async(req, res, next) => {
+    const token = req.cookies?.token 
+    if(!token){
+       return res.status(401).send({message: "unauthorized"})
+    }
+    jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
+         if(err){
+          return res.status(401).send({message: "unauthorized"})
+         }
+         req.user = decoded
+         next()
+    })
+}
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -36,7 +50,6 @@ async function run() {
     const orderCollection = database.collection("order");
 
     app.get("/services", async(req, res) => {
-        console.log(req.cookies.token)
         const cursor = serviceCollection.find();
         const result = await cursor.toArray()
         res.send(result)
@@ -49,8 +62,12 @@ async function run() {
           res.send(result)
     })
 
-    app.get("/orders", async(req, res) => {
+    app.get("/orders", verifyToken, async(req, res) => {
       let query = {}
+      if(req.query.email !== req.user.email){
+        return res.status(403).send({message: "forbidden access"})
+
+      }
       if(req.query.email){
         query = {customerEmail: req.query.email}
       }
